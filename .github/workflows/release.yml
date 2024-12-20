@@ -28,7 +28,7 @@ jobs:
           prerelease: true
 
   release:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && matches(github.ref, 'refs/tags/\d+\.\d+')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: draft-release
     runs-on: ubuntu-latest
     steps:
