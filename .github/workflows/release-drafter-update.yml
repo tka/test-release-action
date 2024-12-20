@@ -1,0 +1,13 @@
+name: Update Draft Release
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  update_draft_release:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: release-drafter/release-drafter@v6
+        with:
