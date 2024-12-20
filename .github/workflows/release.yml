@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  push:
+    tags:
+      - '*' # 監聽所有 tag
+
+jobs:
+  draft-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Draft a release
+        uses: release-drafter/release-drafter@v5
+        id: release_drafter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .github/release-drafter.yml
+          draft: true
+          prerelease: true
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && matches(github.ref, 'refs/tags/\d+\.\d+')
+    needs: draft-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag (using git describe)
+        id: previoustag
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --match "[0-9]*.[0-9]*" 2>/dev/null)
+          if [[ -z "$PREV_TAG" ]]; then
+            echo "::set-output name=tag::0.0"
+          else
+            echo "::set-output name=tag::$PREV_TAG"
+          fi
+          echo "Previous tag: ${{ steps.previoustag.outputs.tag }}"
+
+      - name: Release from draft
+        uses: actions/github-script@v6
+        env:
+          RELEASE_ID: ${{ needs.draft-release.outputs.release_drafter.release_id }}
+          PREVIOUS_TAG: ${{ steps.previoustag.outputs.tag }}
+          CURRENT_TAG: ${{ github.ref_name }}
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: process.env.RELEASE_ID,
+            });
+
+            const currentTag = process.env.CURRENT_TAG;
+            const previousTag = process.env.PREVIOUS_TAG;
+             console.log(`Comparing ${previousTag} to ${currentTag}`);
+
+            const changelog = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: previousTag,
+                head: currentTag,
+            });
+            
+            const prs = changelog.data.commits.filter(commit => commit.commit.message.includes('Merge pull request')).map(commit => {
+                const prNumber = commit.commit.message.match(/Merge pull request #(\d+)/)[1]
+                return `* Merge pull request #${prNumber}`
+            }).join('\n')
+
+            github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: process.env.RELEASE_ID,
+              draft: false,
+              prerelease: false,
+              body: prs || "No changes in this release." // 如果沒有 PR，顯示訊息
+            });
