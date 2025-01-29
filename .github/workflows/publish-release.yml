@@ -36,3 +36,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload binary to release
         run: gh release upload ${{ github.ref_name }} main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
