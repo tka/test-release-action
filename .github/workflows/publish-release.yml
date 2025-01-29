@@ -6,6 +6,8 @@ on:
 
 
 jobs:
+  build: 
+
   publish_stable:
     runs-on: ubuntu-latest
     permissions:
@@ -16,7 +18,14 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '^1.23.5' # The Go version to download (if necessary) and use.
+      - run: go version
+      - name: build binary
+        - run: make build
+        
       - name: Publish Stable Release
         uses: release-drafter/release-drafter@v6
         with:
